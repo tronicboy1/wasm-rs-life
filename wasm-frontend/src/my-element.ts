@@ -1,8 +1,8 @@
-import { LitElement, css, html } from 'lit'
-import { customElement, property } from 'lit/decorators.js'
-import litLogo from './assets/lit.svg'
-import viteLogo from '/vite.svg'
-import {greet} from '../../pkg/wasm_rs';
+import { LitElement, css, html } from "lit";
+import { customElement, property } from "lit/decorators.js";
+import { greet } from "../../pkg/wasm_rs";
+import { observe } from "@tronicboy/lit-observe-directive";
+import { Observable, map, timer } from "rxjs";
 
 /**
  * An example element.
@@ -10,48 +10,49 @@ import {greet} from '../../pkg/wasm_rs';
  * @slot - This element has a slot
  * @csspart button - The button
  */
-@customElement('my-element')
+@customElement("my-element")
 export class MyElement extends LitElement {
-  /**
-   * Copy for the read the docs hint.
-   */
-  @property()
-  docsHint = 'Click on the Vite and Lit logos to learn more'
+  private init: boolean[][] = [
+    [true, false, false, false, false],
+    [true, false, false, false, false],
+    [true, false, false, false, false],
+    [true, false, false, false, false],
+    [true, false, false, false, false],
+    [true, false, false, false, false],
+  ];
+  private universe$ = new Observable<boolean[][]>((observer) => {
+    let state: boolean[][] = this.init;
 
-  /**
-   * The number of times the button has been clicked.
-   */
-  @property({ type: Number })
-  count = 0
+    const t = setTimeout(() => {
+      observer.next(state);
+    }, 1000);
+
+    return () => clearTimeout(t);
+  });
 
   connectedCallback(): void {
     super.connectedCallback();
-
-    greet("Austin");
   }
 
   render() {
     return html`
-      <div>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src=${viteLogo} class="logo" alt="Vite logo" />
-        </a>
-        <a href="https://lit.dev" target="_blank">
-          <img src=${litLogo} class="logo lit" alt="Lit logo" />
-        </a>
-      </div>
-      <slot></slot>
-      <div class="card">
-        <button @click=${this._onClick} part="button">
-          count is ${this.count}
-        </button>
-      </div>
-      <p class="read-the-docs">${this.docsHint}</p>
-    `
-  }
-
-  private _onClick() {
-    this.count++
+      <table>
+        <tbody>
+          ${observe(
+            this.universe$.pipe(
+              map((uni) =>
+                uni.map(
+                  (row) =>
+                    html`<tr>
+                      ${row.map((col) => col ? "*" : " ").map((col) => html`<td>${col}</td>`)}
+                    </tr>`,
+                ),
+              ),
+            ),
+          )}
+        </tbody>
+      </table>
+    `;
   }
 
   static styles = css`
@@ -62,73 +63,17 @@ export class MyElement extends LitElement {
       text-align: center;
     }
 
-    .logo {
-      height: 6em;
-      padding: 1.5em;
-      will-change: filter;
-      transition: filter 300ms;
+    table {
+      border: 1px solid;
+      table-layout: fixed;
+      width: 100%;
+      height: 80%
     }
-    .logo:hover {
-      filter: drop-shadow(0 0 2em #646cffaa);
-    }
-    .logo.lit:hover {
-      filter: drop-shadow(0 0 2em #325cffaa);
-    }
-
-    .card {
-      padding: 2em;
-    }
-
-    .read-the-docs {
-      color: #888;
-    }
-
-    ::slotted(h1) {
-      font-size: 3.2em;
-      line-height: 1.1;
-    }
-
-    a {
-      font-weight: 500;
-      color: #646cff;
-      text-decoration: inherit;
-    }
-    a:hover {
-      color: #535bf2;
-    }
-
-    button {
-      border-radius: 8px;
-      border: 1px solid transparent;
-      padding: 0.6em 1.2em;
-      font-size: 1em;
-      font-weight: 500;
-      font-family: inherit;
-      background-color: #1a1a1a;
-      cursor: pointer;
-      transition: border-color 0.25s;
-    }
-    button:hover {
-      border-color: #646cff;
-    }
-    button:focus,
-    button:focus-visible {
-      outline: 4px auto -webkit-focus-ring-color;
-    }
-
-    @media (prefers-color-scheme: light) {
-      a:hover {
-        color: #747bff;
-      }
-      button {
-        background-color: #f9f9f9;
-      }
-    }
-  `
+  `;
 }
 
 declare global {
   interface HTMLElementTagNameMap {
-    'my-element': MyElement
+    "my-element": MyElement;
   }
 }
