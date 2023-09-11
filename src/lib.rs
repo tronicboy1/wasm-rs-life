@@ -1,6 +1,8 @@
 mod utils;
 mod table;
 
+pub use table::Table;
+
 use wasm_bindgen::prelude::*;
 
 #[wasm_bindgen]
