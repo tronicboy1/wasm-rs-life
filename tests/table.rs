@@ -14,6 +14,6 @@ fn main() {
 
     for _ in 0..10 {
         println!("{}", table);
-        table = table.tick();
+        table.tick();
     }
 }

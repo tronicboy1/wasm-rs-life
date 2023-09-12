@@ -29,14 +29,66 @@ impl Table {
         }
     }
 
-    pub fn tick(self) -> Self {
-        let block_table: BlockTable = self.into();
+    pub fn tick(&mut self) {
+        let blocks = self.blocks();
 
-        block_table.tick()
+        for (col, block) in self.values.iter_mut().zip(blocks) {
+            *col = match block {
+                Block {
+                    value: CellState::Alive,
+                    live_count,
+                } if live_count < 2 || live_count > 3 => CellState::Dead,
+                Block {
+                    value: CellState::Dead,
+                    live_count,
+                } if live_count == 3 => CellState::Alive,
+                _ => CellState::Dead,
+            }
+        }
     }
 
     fn rows(&self) -> Chunks<'_, CellState> {
         self.values.chunks(self.width)
+    }
+
+    fn blocks(&self) -> Vec<Block> {
+        let row_count = self.height;
+        let cols = self.width;
+
+        let prev_row = self.rows().cycle().skip(row_count - 1);
+        let curr_row = self.rows();
+        let next_row = self.rows().cycle().skip(row_count + 1);
+
+        let block_rows = curr_row
+            .zip(prev_row)
+            .zip(next_row)
+            .map(|((curr_row, prev_row), next_row)| (prev_row, curr_row, next_row));
+
+        block_rows
+            .enumerate()
+            .map(move |(i, (prev_row, curr_row, next_row))| {
+                curr_row.iter().enumerate().map(move |(i, value)| {
+                    let (prev, curr, next) = (wrap_prev(i, cols), i, wrap_next(i, cols));
+
+                    dbg!(prev);
+                    // Add all Alive cells around the given cell
+                    let live_count = prev_row[prev]
+                        + prev_row[curr]
+                        + prev_row[next]
+                        + curr_row[prev]
+                        + curr_row[next]
+                        + next_row[prev]
+                        + next_row[curr]
+                        + next_row[next];
+
+                    Block {
+                        value: *value,
+                        live_count,
+                    }
+                })
+            })
+            .flatten()
+            .collect()
     }
 }
 
@@ -101,103 +153,10 @@ impl Display for Table {
     }
 }
 
-impl Into<BlockTable> for Table {
-    fn into(self) -> BlockTable {
-        let row_count = self.height;
-        let cols = self.width;
-
-        let prev_row = self.rows().cycle().skip(row_count - 1);
-        let curr_row = self.rows();
-        let next_row = self.rows().cycle().skip(row_count + 1);
-
-        let block_rows = curr_row
-            .zip(prev_row)
-            .zip(next_row)
-            .map(|((curr_row, prev_row), next_row)| (prev_row, curr_row, next_row));
-
-        let blocks = block_rows
-            .enumerate()
-            .map(|(i, (prev_row, curr_row, next_row))| {
-                curr_row.iter().enumerate().map(move |(i, value)| {
-                    let (prev, curr, next) = (wrap_prev(i, cols), i, wrap_next(i, cols));
-
-                    dbg!(prev);
-                    // Add all Alive cells around the given cell
-                    let live_count = prev_row[prev]
-                        + prev_row[curr]
-                        + prev_row[next]
-                        + curr_row[prev]
-                        + curr_row[next]
-                        + next_row[prev]
-                        + next_row[curr]
-                        + next_row[next];
-
-                    Block {
-                        value: *value,
-                        live_count,
-                    }
-                })
-            })
-            .flatten()
-            .collect();
-
-        BlockTable {
-            heigth: self.height,
-            width: self.width,
-            values: blocks,
-        }
-    }
-}
-
 #[derive(Debug)]
 struct Block {
     value: CellState,
     live_count: u8,
-}
-
-#[derive(Debug)]
-struct BlockTable {
-    heigth: usize,
-    width: usize,
-    values: Vec<Block>,
-}
-
-impl BlockTable {
-    fn tick(self) -> Table {
-        let rows: Vec<CellState> = self
-            .values
-            .chunks(self.heigth)
-            .into_iter()
-            .map(|row| {
-                row.into_iter().map(|block| match block {
-                    Block {
-                        value: CellState::Alive,
-                        live_count,
-                    } if *live_count < 2 || *live_count > 3 => CellState::Dead,
-                    Block {
-                        value: CellState::Dead,
-                        live_count,
-                    } if *live_count == 3 => CellState::Alive,
-                    _ => CellState::Dead,
-                })
-            })
-            .flatten()
-            .collect();
-
-        Table {
-            height: self.heigth,
-            width: self.width,
-            values: rows,
-        }
-    }
-}
-
-impl std::ops::Deref for BlockTable {
-    type Target = Vec<Block>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.values
-    }
 }
 
 fn wrap_prev(i: usize, len: usize) -> usize {
@@ -231,10 +190,9 @@ mod tests {
     #[test]
     fn can_convert_to_blocks() {
         let table = Table::new(5);
-        let blocks: BlockTable = table.into();
+        let blocks = table.blocks();
 
-        assert_eq!(blocks.heigth, 5);
-        assert_eq!(blocks.width, 5);
+        assert_eq!(blocks.len(), 5 * 5);
     }
 
     #[test]
@@ -244,7 +202,7 @@ mod tests {
         table.values[0] = CellState::Alive;
         table.values[24] = CellState::Alive;
 
-        let blocks: BlockTable = table.into();
+        let blocks = table.blocks();
 
         assert_eq!(blocks.len(), 5 * 5);
         assert_eq!(blocks[0].live_count, 1);
@@ -260,10 +218,8 @@ mod tests {
 
     #[test]
     fn can_tick_block_table_to_table() {
-        let table = Table::new(5);
-        let blocks: BlockTable = table.into();
-
-        let table = blocks.tick();
+        let mut table = Table::new(5);
+        table.tick();
 
         assert_eq!(table.width, 5);
         assert_eq!(table.height, 5);
@@ -280,9 +236,7 @@ mod tests {
         table.values[15] = CellState::Alive;
         table.values[20] = CellState::Alive;
 
-        let blocks: BlockTable = table.into();
-
-        let table = blocks.tick();
+        table.tick();
 
         println!("{}", table);
 

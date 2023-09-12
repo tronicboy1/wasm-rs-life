@@ -20,5 +20,7 @@ pub fn greet(name: &str) {
 pub fn tick(u: BooleanTable) -> BooleanTable {
     let mut table = Table::from(u);
 
-    table.tick().into()
+    table.tick();
+
+    table.into()
 }
