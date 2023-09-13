@@ -3,7 +3,10 @@ use wasm_bindgen::prelude::*;
 
 use crate::table::cell_state::CellState;
 
+use self::point::Point;
+
 pub mod cell_state;
+pub mod point;
 
 type Row = Vec<CellState>;
 
@@ -64,6 +67,18 @@ impl Table {
 
     pub fn set(&mut self, i: usize, value: CellState) {
         self[i] = value;
+    }
+
+    pub fn set_point(&mut self, p: &Point, value: CellState) {
+        let row_i = p.y * self.width;
+        let i = row_i + p.x;
+        self[i] = value;
+    }
+
+    fn set_points(&mut self, points: &[Point], value: CellState) {
+        for p in points {
+            self.set_point(p, value);
+        }
     }
 
     pub fn render(&self) -> String {
