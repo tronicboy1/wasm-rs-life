@@ -1,4 +1,5 @@
 use std::{fmt::Display, slice::Chunks};
+use wasm_bindgen::prelude::*;
 
 use crate::table::cell_state::CellState;
 
@@ -6,12 +7,14 @@ pub mod cell_state;
 
 type Row = Vec<CellState>;
 
+#[wasm_bindgen]
 pub struct Table {
     height: usize,
     width: usize,
     values: Vec<CellState>,
 }
 
+#[wasm_bindgen]
 impl Table {
     /// Creates new square lable of size n
     ///
@@ -26,6 +29,18 @@ impl Table {
             height: size,
             width: size,
             values: rows,
+        }
+    }
+
+    pub fn of_size(width: u32, height: u32) -> Self {
+        assert!(width > 3 && height > 3);
+
+        let values = (0..(height * width)).map(|_| CellState::Dead).collect();
+
+        Self {
+            height: height as usize,
+            width: width as usize,
+            values,
         }
     }
 
@@ -45,6 +60,22 @@ impl Table {
                 _ => CellState::Dead,
             }
         }
+    }
+
+    pub fn render(&self) -> String {
+        self.to_string()
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+
+    pub fn cells(&self) -> *const CellState {
+        std::vec::Vec::as_ptr(&self.values)
     }
 
     fn rows(&self) -> Chunks<'_, CellState> {
@@ -70,7 +101,6 @@ impl Table {
                 curr_row.iter().enumerate().map(move |(i, value)| {
                     let (prev, curr, next) = (wrap_prev(i, cols), i, wrap_next(i, cols));
 
-                    dbg!(prev);
                     // Add all Alive cells around the given cell
                     let live_count = prev_row[prev]
                         + prev_row[curr]
@@ -135,19 +165,25 @@ impl std::ops::Deref for Table {
     }
 }
 
+impl std::ops::DerefMut for Table {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.values
+    }
+}
+
 impl Display for Table {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let len = self.width;
-        println!("+-{}-+", "-".repeat(len));
+        writeln!(f, "+-{}-+", "-".repeat(len))?;
         let rows = self.rows();
         for row in rows {
-            print!("| ");
+            write!(f, "| ")?;
             for cell in row {
-                print!("{}", cell);
+                write!(f, "{}", cell)?;
             }
-            println!(" |");
+            writeln!(f, " |")?;
         }
-        println!("+-{}-+", "-".repeat(len));
+        writeln!(f, "+-{}-+", "-".repeat(len))?;
 
         Ok(())
     }
@@ -238,8 +274,6 @@ mod tests {
 
         table.tick();
 
-        println!("{}", table);
-
         assert_eq!(table.len(), 5 * 5);
 
         assert_eq!(table[0], CellState::Dead);
@@ -259,5 +293,14 @@ mod tests {
         assert_eq!(table[14], CellState::Alive);
         assert_eq!(table[19], CellState::Alive);
         assert_eq!(table[24], CellState::Alive);
+    }
+
+    #[test]
+    fn can_convert_string() {
+        let table = Table::new(5);
+
+        let s = table.to_string();
+
+        assert_eq!(s.lines().count(), 7);
     }
 }

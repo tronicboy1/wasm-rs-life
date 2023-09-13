@@ -1,6 +1,5 @@
 use std::fmt::Display;
 
-#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellState {
     Dead,
