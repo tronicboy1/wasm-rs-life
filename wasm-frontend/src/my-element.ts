@@ -50,7 +50,7 @@ export class MyElement extends LitElement {
         startWith(table)
       )
     ),
-    this.tick(2000),
+    this.tick(200),
     shareReplay(1)
   );
   private ticks$ = this.universe$.pipe(map(([_, ticks]) => ticks));

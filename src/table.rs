@@ -24,6 +24,9 @@ impl Table {
     /// # Panics!
     /// If size is less than 3
     pub fn new(size: usize) -> Self {
+        // Allow console.error logs of panic
+        crate::utils::set_panic_hook();
+
         assert!(size >= 3);
 
         let rows = (0..(size * size)).map(|_| CellState::Dead).collect();
@@ -52,10 +55,22 @@ impl Table {
 
         for (col, block) in self.values.iter_mut().zip(blocks) {
             *col = match block {
+                // Rule 1: Any live cell with fewer than two live neighbours
+                // dies, as if caused by underpopulation.
+                // Rule 3: Any live cell with more than three live
+                // neighbours dies, as if by overpopulation.
                 Block {
                     value: CellState::Alive,
                     live_count,
                 } if live_count < 2 || live_count > 3 => CellState::Dead,
+                // Rule 2: Any live cell with two or three live neighbours
+                // lives on to the next generation.
+                Block {
+                    value: CellState::Alive,
+                    live_count: 2 | 3,
+                } => CellState::Alive,
+                // Rule 4: Any dead cell with exactly three live neighbours
+                // becomes a live cell, as if by reproduction.
                 Block {
                     value: CellState::Dead,
                     live_count,
@@ -63,6 +78,9 @@ impl Table {
                 _ => CellState::Dead,
             }
         }
+
+        // Can log into JS directly
+        // web_sys::console::log_1(&"Ticked!".into());
     }
 
     pub fn set(&mut self, i: usize, value: CellState) {
@@ -299,11 +317,11 @@ mod tests {
 
         assert_eq!(table.len(), 5 * 5);
 
-        assert_eq!(table[0], CellState::Dead);
-        assert_eq!(table[5], CellState::Dead);
-        assert_eq!(table[10], CellState::Dead);
-        assert_eq!(table[15], CellState::Dead);
-        assert_eq!(table[20], CellState::Dead);
+        assert_eq!(table[0], CellState::Alive);
+        assert_eq!(table[5], CellState::Alive);
+        assert_eq!(table[10], CellState::Alive);
+        assert_eq!(table[15], CellState::Alive);
+        assert_eq!(table[20], CellState::Alive);
 
         assert_eq!(table[1], CellState::Alive);
         assert_eq!(table[6], CellState::Alive);
