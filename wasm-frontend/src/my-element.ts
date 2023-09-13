@@ -3,16 +3,18 @@ import {customElement, state} from "lit/decorators.js";
 import {Table, create_table} from "../../pkg/wasm_rs";
 import {memory} from "../../pkg/wasm_rs_bg.wasm";
 import {observe} from "@tronicboy/lit-observe-directive";
+import {queryFromEvent} from "@tronicboy/lit-from-event";
 import {
   Observable,
   OperatorFunction,
   Subject,
-  buffer,
   debounceTime,
+  filter,
   map,
   shareReplay,
   startWith,
   switchMap,
+  takeUntil,
 } from "rxjs";
 import {styleMap} from "lit/directives/style-map.js";
 
@@ -24,88 +26,69 @@ import {styleMap} from "lit/directives/style-map.js";
  */
 @customElement("my-element")
 export class MyElement extends LitElement {
-  private canvasSquareSize$ = new Subject<number>();
+  @queryFromEvent("input#size", "input", {returnElementRef: true}) sizeInput$!: Observable<HTMLInputElement>;
+  private canvasSquareSize$ = this.sizeInput$.pipe(
+    map(el => el.value),
+    map(Number),
+    filter(num => !isNaN(num)),
+    startWith(100)
+  );
   private initChange$ = new Subject<[number, number]>();
   private mouseup$ = new Subject<void>();
   private mousedown$ = new Subject<void>();
+  private changes$ = this.mousedown$.pipe(switchMap(() => this.initChange$.pipe(takeUntil(this.mouseup$))));
 
   private universe$ = this.canvasSquareSize$.pipe(
     map(size => create_table(new Uint8Array(size ** 2).fill(0), size, size)),
-    this.cacheLastTable(this.initChange$),
+    switchMap(table =>
+      this.initChange$.pipe(
+        map(([i, val]) => {
+          table.set(i, val);
+          return table;
+        }),
+        debounceTime(10),
+        startWith(table)
+      )
+    ),
+    this.tick(2000),
     shareReplay(1)
   );
-  private tick$ = this.universe$.pipe(this.tick());
+  private ticks$ = this.universe$.pipe(map(([_, ticks]) => ticks));
+  private table$ = this.universe$.pipe(map(([table]) => table));
 
   @state() ticks = 0;
 
-  protected firstUpdated(_changedProperties: PropertyValueMap<any> | Map<PropertyKey, unknown>): void {
-    this.canvasSquareSize$.next(100);
-
-    this.tick$.subscribe(([_, ticks]) => {
-      this.ticks = ticks;
-    });
-  }
-
-  cacheLastTable(changes$: Observable<[number, number]>): OperatorFunction<Table, Table> {
-    return source => {
-      let lastTable: Table;
-      let lastArrayBuff: Uint8Array | undefined;
-
-      return source.pipe(
-        switchMap(initTable => {
-          lastTable = initTable;
-
-          return this.mousedown$.pipe(
-            switchMap(() => changes$.pipe(buffer(this.mouseup$))),
-            map(changes => {
-              const cellPtr = lastTable.cells();
-              const cells = new Uint8Array(memory.buffer, cellPtr, initTable.width() * initTable.height());
-
-              lastArrayBuff ??= structuredClone(cells);
-
-              for (const [i, val] of changes) {
-                lastArrayBuff[i] = val;
-              }
-
-              return lastArrayBuff;
-            }),
-            map(values => {
-              let lastTable = create_table(values, initTable.width(), initTable.height());
-
-              return lastTable;
-            }),
-            startWith(initTable)
-          );
-        })
-      );
-    };
-  }
-
-  tick(): OperatorFunction<Table, [Table, number]> {
+  tick(interval = 1000): OperatorFunction<Table, [Table, number]> {
     return source =>
-      source.pipe(
-        switchMap(
-          table =>
-            new Observable<[Table, number]>(observer => {
-              let ticks = 0;
-              let timer = setInterval(() => {
-                table.tick();
-                ticks += 1;
+      new Observable<[Table, number]>(observer => {
+        let ticks = 0;
+        let table: Table;
 
-                observer.next([table, ticks]);
+        let sub = source.subscribe({
+          next: sourceTable => {
+            table ??= sourceTable;
 
-                if (ticks % 5 === 0) {
-                  const cells = getCellsFromTable(table);
-                  if (cells.every(cell => cell === 0)) {
-                    observer.complete();
-                  }
-                }
-              }, 100);
+            observer.next([table, ticks]);
+          },
+          complete: () => observer.complete(),
+        });
 
-              return () => clearInterval(timer);
-            })
-        )
-      );
+        let timer = setInterval(() => {
+          if (!table) return;
+
+          if (table.is_alive()) {
+            table.tick();
+            ticks += 1;
+
+            observer.next([table, ticks]);
+          }
+        }, interval);
+
+        return () => {
+          clearInterval(timer);
+          sub.unsubscribe();
+        };
+      });
   }
 
   render() {
@@ -113,17 +96,17 @@ export class MyElement extends LitElement {
       <label for="size">Table Size:</label>
       <input type="number" min="3" value="100" id="size" />
       <label for="ticks">Ticks:</label>
-      <input type="number" readonly .value=${String(this.ticks)} />
+      <input type="number" readonly .value=${observe(this.ticks$.pipe(map(String)))} />
       <canvas></canvas>
       <table>
         <tbody
           @mouseup=${() => this.mouseup$.next()}
           @mousedown=${() => this.mousedown$.next()}
+          @mouseleave=${() => this.mouseup$.next()}
         >
           ${observe(
-            this.universe$.pipe(
+            this.table$.pipe(
               map(universe => {
-                console.log(universe);
                 const width = universe.width();
                 const height = universe.height();
 
@@ -143,7 +126,13 @@ export class MyElement extends LitElement {
                             "background-color": value === 1 ? "black" : "white",
                           })}
                           @mouseover=${() => {
-                            this.initChange$.next([index, 1]);
+                            if (index > 1) {
+                              this.initChange$.next([index - 1, 1]);
+                            }
+                            //this.initChange$.next([index, 1]);
+                            if (index < width * height - 1) {
+                              this.initChange$.next([index + 1, 1]);
+                            }
                           }}
                         ></td>`;
                       })}
@@ -166,6 +155,7 @@ export class MyElement extends LitElement {
       margin: 0 auto;
       padding: 2rem;
       text-align: center;
+      user-select: none;
     }
 
     table {
@@ -196,9 +186,4 @@ declare global {
   interface HTMLElementTagNameMap {
     "my-element": MyElement;
   }
-}
-
-function getCellsFromTable(table: Table): Uint8Array {
-  const cellPtr = table.cells();
-  return new Uint8Array(memory.buffer, cellPtr, table.width() * table.height());
 }

@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tronicboy/lit-from-event": "^0.0.6",
     "@tronicboy/lit-observe-directive": "^0.1.1",
     "lit": "^2.7.6",
     "rxjs": "^7.8.1"

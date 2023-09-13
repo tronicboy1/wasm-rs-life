@@ -62,6 +62,10 @@ impl Table {
         }
     }
 
+    pub fn set(&mut self, i: usize, value: CellState) {
+        self[i] = value;
+    }
+
     pub fn render(&self) -> String {
         self.to_string()
     }
@@ -72,6 +76,10 @@ impl Table {
 
     pub fn width(&self) -> usize {
         self.width
+    }
+
+    pub fn is_alive(&self) -> bool {
+        self.values.iter().any(|c| c == &CellState::Alive)
     }
 
     pub fn cells(&self) -> *const CellState {

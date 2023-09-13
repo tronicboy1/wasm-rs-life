@@ -1,5 +1,7 @@
 use std::fmt::Display;
+use wasm_bindgen::prelude::*;
 
+#[wasm_bindgen]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum CellState {
     Dead,
