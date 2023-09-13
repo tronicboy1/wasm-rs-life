@@ -41,7 +41,7 @@ export class MyElement extends LitElement {
   private universe$ = this.canvasSquareSize$.pipe(
     map(size => create_table(new Uint8Array(size ** 2).fill(0), size, size)),
     switchMap(table =>
-      this.initChange$.pipe(
+      this.changes$.pipe(
         map(([i, val]) => {
           table.set(i, val);
           return table;
