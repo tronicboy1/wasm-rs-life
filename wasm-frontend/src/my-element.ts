@@ -1,4 +1,4 @@
-import {LitElement, PropertyValueMap, css, html} from "lit";
+import {LitElement, PropertyValues, css, html} from "lit";
 import {customElement, state} from "lit/decorators.js";
 import {Table, create_table} from "../../pkg/wasm_rs";
 import {memory} from "../../pkg/wasm_rs_bg.wasm";
@@ -94,7 +94,7 @@ export class MyElement extends LitElement {
   render() {
     return html`
       <label for="size">Table Size:</label>
-      <input type="number" min="3" value="100" id="size" />
+      <input type="number" min="3" .value=${observe(this.canvasSquareSize$.pipe(map(String)))} id="size" />
       <label for="ticks">Ticks:</label>
       <input type="number" readonly .value=${observe(this.ticks$.pipe(map(String)))} />
       <canvas></canvas>
@@ -129,7 +129,7 @@ export class MyElement extends LitElement {
                             if (index > 1) {
                               this.initChange$.next([index - 1, 1]);
                             }
-                            //this.initChange$.next([index, 1]);
+                            this.initChange$.next([index, 1]);
                             if (index < width * height - 1) {
                               this.initChange$.next([index + 1, 1]);
                             }
@@ -142,7 +142,10 @@ export class MyElement extends LitElement {
 
                 return rows;
               })
-            )
+            ),
+            {
+              useViewTransitions: true,
+            }
           )}
         </tbody>
       </table>
@@ -180,6 +183,18 @@ export class MyElement extends LitElement {
       margin: 1rem auto;
     }
   `;
+
+  override update(changed: PropertyValues) {
+    const update = super.update.bind(this, changed);
+
+    if (!("startViewTransition" in document)) {
+      update();
+      return;
+    }
+
+    // TypeScriptはまだstartViewTransitionを知らないようです
+    (document as any).startViewTransition(update);
+  }
 }
 
 declare global {

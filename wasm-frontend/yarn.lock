@@ -132,10 +132,10 @@
     lit "^2.7.2"
     rxjs "^7.8.0"
 
-"@tronicboy/lit-observe-directive@^0.1.1":
-  version "0.1.1"
-  resolved "https://registry.npmjs.org/@tronicboy/lit-observe-directive/-/lit-observe-directive-0.1.1.tgz"
-  integrity sha512-Wtzqd1U1//QAPLwsVLzVUIjZZEu2lac6Z+uqKfIMIU7ItcNFT1Sn5v8Fo9sG1+JXSofuRuKfF+mvQZaaAxeHfw==
+"@tronicboy/lit-observe-directive@^0.2.0":
+  version "0.2.0"
+  resolved "https://registry.yarnpkg.com/@tronicboy/lit-observe-directive/-/lit-observe-directive-0.2.0.tgz#8c3c4c66589bc3decbe9d19e474beca18b275800"
+  integrity sha512-xQswfZ1axT+P8PLXLPccBv+wb0Cn9Xkj6fkEnWICIV+sif+Y0zG5A9QGmkGeJDghE3Z+hl3SX7Nxi4RKSSfj0w==
 
 "@types/trusted-types@^2.0.2":
   version "2.0.3"
