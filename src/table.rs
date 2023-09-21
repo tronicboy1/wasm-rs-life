@@ -1,12 +1,13 @@
-use std::{fmt::Display, slice::Chunks};
+use std::fmt::Display;
 use wasm_bindgen::prelude::*;
 
 use crate::table::cell_state::CellState;
 
-use self::point::Point;
+use self::{point::Point, rows::Rows};
 
 pub mod cell_state;
 pub mod point;
+mod rows;
 
 type Row = Vec<CellState>;
 
@@ -119,8 +120,8 @@ impl Table {
         std::vec::Vec::as_ptr(&self.values)
     }
 
-    fn rows(&self) -> Chunks<'_, CellState> {
-        self.values.chunks(self.width)
+    fn rows(&self) -> Rows<'_> {
+        Rows::new(&self.values, self.width)
     }
 
     fn blocks(&self) -> Vec<Block> {

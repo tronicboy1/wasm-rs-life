@@ -8,9 +8,11 @@ import {
   Observable,
   OperatorFunction,
   Subject,
+  Subscription,
   debounceTime,
   filter,
   map,
+  scan,
   shareReplay,
   startWith,
   switchMap,
@@ -27,11 +29,18 @@ import {styleMap} from "lit/directives/style-map.js";
 @customElement("my-element")
 export class MyElement extends LitElement {
   @queryFromEvent("input#size", "input", {returnElementRef: true}) sizeInput$!: Observable<HTMLInputElement>;
+  @queryFromEvent("button#play-pause", "click", {returnElementRef: true})
+  playPauseInput$!: Observable<HTMLInputElement>;
+  private playPause$ = this.playPauseInput$.pipe(
+    scan(acc => !acc, false),
+    startWith(false),
+    shareReplay(1)
+  );
   private canvasSquareSize$ = this.sizeInput$.pipe(
     map(el => el.value),
     map(Number),
     filter(num => !isNaN(num)),
-    startWith(100)
+    startWith(50)
   );
   private initChange$ = new Subject<[number, number]>();
   private mouseup$ = new Subject<void>();
@@ -50,7 +59,7 @@ export class MyElement extends LitElement {
         startWith(table)
       )
     ),
-    this.tick(200),
+    this.tick(150),
     shareReplay(1)
   );
   private ticks$ = this.universe$.pipe(map(([_, ticks]) => ticks));
@@ -63,26 +72,45 @@ export class MyElement extends LitElement {
       new Observable<[Table, number]>(observer => {
         let ticks = 0;
         let table: Table;
+        let timer: ReturnType<typeof setInterval>;
 
-        let sub = source.subscribe({
-          next: sourceTable => {
-            table ??= sourceTable;
+        let sub = new Subscription();
 
-            observer.next([table, ticks]);
-          },
-          complete: () => observer.complete(),
-        });
+        const startTimer = () => {
+          timer = setInterval(() => {
+            if (!table) return;
 
-        let timer = setInterval(() => {
-          if (!table) return;
+            if (table.is_alive()) {
+              table.tick();
+              ticks += 1;
 
-          if (table.is_alive()) {
-            table.tick();
-            ticks += 1;
+              observer.next([table, ticks]);
+            }
+          }, interval);
+        };
 
-            observer.next([table, ticks]);
-          }
-        }, interval);
+        sub.add(
+          source.subscribe({
+            next: sourceTable => {
+              table ??= sourceTable;
+
+              observer.next([table, ticks]);
+            },
+            complete: () => observer.complete(),
+          })
+        );
+
+        sub.add(
+          this.playPause$.subscribe({
+            next: play => {
+              if (play) {
+                startTimer();
+              } else {
+                clearInterval(timer);
+              }
+            },
+          })
+        );
 
         return () => {
           clearInterval(timer);
@@ -97,7 +125,7 @@ export class MyElement extends LitElement {
       <input type="number" min="3" .value=${observe(this.canvasSquareSize$.pipe(map(String)))} id="size" />
       <label for="ticks">Ticks:</label>
       <input type="number" readonly .value=${observe(this.ticks$.pipe(map(String)))} />
-      <canvas></canvas>
+      <button id="play-pause">${observe(this.playPause$.pipe(map(play => (play ? "Pause" : "Play"))))}</button>
       <table>
         <tbody
           @mouseup=${() => this.mouseup$.next()}
@@ -121,19 +149,22 @@ export class MyElement extends LitElement {
                       ${new Array(width).fill(0).map((_, i) => {
                         const index = row * width + i;
                         const value = cells[index];
+
+                        const changeCb = () => {
+                          // if (index > 1) {
+                          //   this.initChange$.next([index - 1, 1]);
+                          // }
+                          this.initChange$.next([index, 1]);
+                          // if (index < width * height - 1) {
+                          //   this.initChange$.next([index + 1, 1]);
+                          // }
+                        };
+
                         return html`<td
                           style=${styleMap({
                             "background-color": value === 1 ? "black" : "white",
                           })}
-                          @mouseover=${() => {
-                            if (index > 1) {
-                              this.initChange$.next([index - 1, 1]);
-                            }
-                            this.initChange$.next([index, 1]);
-                            if (index < width * height - 1) {
-                              this.initChange$.next([index + 1, 1]);
-                            }
-                          }}
+                          @mouseover=${changeCb}
                         ></td>`;
                       })}
                     </tr>`
