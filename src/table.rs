@@ -231,6 +231,8 @@ impl Display for Table {
     }
 }
 
+/// An array of 3x3 blocks with the center being the target cell. Used to calculate the
+/// value in the next tick of a table for a given cell.
 #[derive(Debug)]
 struct Block {
     value: CellState,
